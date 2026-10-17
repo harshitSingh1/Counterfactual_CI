@@ -30,9 +30,11 @@ const CATEGORY_META: Record<
 export function ImpactGraph({
   nodes,
   edges,
+  showInspector = true,
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  showInspector?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -72,17 +74,21 @@ export function ImpactGraph({
 
   return (
     <Panel className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-base-700/70 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-base-700/70 px-3 py-2.5">
         <div>
-          <h3 className="text-sm font-semibold text-slate-100">Dependency Trace Graph</h3>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Traced via FalkorDB · {nodes.length} nodes · {edges.length} edges
-          </p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-100">Dependency Trace Graph</h3>
+            <span className="border border-violet-400/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300">Demo graph</span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-slate-500">Static relationship preview · {nodes.length} nodes · {edges.length} edges</p>
         </div>
-        <Legend />
+        <div className="flex items-center gap-2">
+          {selectedId && <button onClick={() => setSelectedId(null)} className="text-[10px] text-slate-500 hover:text-slate-200">Reset</button>}
+          <Legend />
+        </div>
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
+      <div className={showInspector ? 'grid gap-0 lg:grid-cols-[1fr_280px]' : ''}>
         <div className="relative overflow-x-auto bg-base-950/40">
           <svg
             ref={svgRef}
@@ -180,20 +186,19 @@ export function ImpactGraph({
           </svg>
         </div>
 
-        {/* Detail panel */}
-        <div className="border-t border-base-700/70 p-4 lg:border-l lg:border-t-0">
-          {selected ? (
-            <NodeDetail node={selected} />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center py-8 text-center">
-              <Info size={22} className="text-slate-600" />
-              <p className="mt-3 text-sm text-slate-400">Select a node to inspect its details.</p>
-              <p className="mt-1 text-xs text-slate-600">
-                Hovering highlights connected traces.
-              </p>
-            </div>
-          )}
-        </div>
+        {showInspector && (
+          <div className="border-t border-base-700/70 p-4 lg:border-l lg:border-t-0">
+            {selected ? (
+              <NodeDetail node={selected} />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+                <Info size={22} className="text-slate-600" />
+                <p className="mt-3 text-sm text-slate-400">Select a node to inspect its details.</p>
+                <p className="mt-1 text-xs text-slate-600">Hovering highlights connected traces.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Panel>
   );

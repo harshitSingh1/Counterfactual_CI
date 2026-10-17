@@ -2,13 +2,13 @@ import type { PRScenario } from '@/types';
 import { Panel, PanelHeader, Badge } from '@/components/ui';
 import { FileCode2, AlertTriangle, ArrowRight } from 'lucide-react';
 
-export function CodeChangePanel({ scenario }: { scenario: PRScenario }) {
+export function CodeChangePanel({ scenario, compact = false }: { scenario: PRScenario; compact?: boolean }) {
   const breakingCount = scenario.contract.filter((c) => c.breaking).length;
   return (
     <div className="space-y-4">
       <Panel>
         <PanelHeader
-          title={`PR #${scenario.number} — ${scenario.title}`}
+          title={`Code Change · PR #${scenario.number}`}
           subtitle={scenario.file}
           icon={<FileCode2 size={16} />}
           right={
@@ -21,13 +21,14 @@ export function CodeChangePanel({ scenario }: { scenario: PRScenario }) {
             )
           }
         />
-        <div className="px-4 py-3">
-          <p className="text-sm leading-relaxed text-slate-300">{scenario.description}</p>
+        <div className="px-3 py-3">
+          <p className="text-xs leading-relaxed text-slate-300">{scenario.description}</p>
+          <div className="mt-2 text-[11px] text-slate-500"><span className="font-mono text-slate-300">{scenario.file}</span> · illustrative sample</div>
         </div>
       </Panel>
 
       <Panel className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-base-700/70 px-4 py-2.5">
+        <div className="flex items-center justify-between border-b border-base-700/70 px-3 py-2.5">
           <h3 className="text-sm font-semibold text-slate-100">Diff</h3>
           <div className="flex items-center gap-3 text-[11px] text-slate-500">
             <span className="flex items-center gap-1">
@@ -58,14 +59,14 @@ export function CodeChangePanel({ scenario }: { scenario: PRScenario }) {
                   line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' ';
                 return (
                   <tr key={i} className={`${bg} hover:brightness-125`}>
-                    <td className="w-10 select-none border-r border-base-700/40 px-2 text-right text-slate-600">
+                    <td className="w-9 select-none border-r border-base-700/40 px-1.5 text-right text-slate-600">
                       {line.oldNo ?? ''}
                     </td>
-                    <td className="w-10 select-none border-r border-base-700/40 px-2 text-right text-slate-600">
+                    <td className="w-9 select-none border-r border-base-700/40 px-1.5 text-right text-slate-600">
                       {line.newNo ?? ''}
                     </td>
                     <td className={`w-5 select-none pl-3 ${text}`}>{marker}</td>
-                    <td className={`whitespace-pre px-3 py-0.5 ${text}`}>{line.text}</td>
+                    <td className={`whitespace-pre px-2 py-0.5 ${text}`}>{line.text}</td>
                   </tr>
                 );
               })}
@@ -74,8 +75,18 @@ export function CodeChangePanel({ scenario }: { scenario: PRScenario }) {
         </div>
       </Panel>
 
-      <Panel>
-        <div className="border-b border-base-700/70 px-4 py-2.5">
+      {compact && (
+        <Panel>
+          <div className="border-b border-base-700/80 px-3 py-2.5"><h3 className="text-sm font-semibold text-slate-100">Contract diff</h3></div>
+          <div className="grid grid-cols-2 divide-x divide-base-700/80">
+            <div className="bg-red-500/5 p-3"><div className="text-[10px] font-medium uppercase tracking-wider text-red-300">Before</div><pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-300">{scenario.contract.slice(0, 3).map((item) => `${item.field}: ${item.before}`).join('\\n')}</pre></div>
+            <div className="bg-emerald-500/5 p-3"><div className="text-[10px] font-medium uppercase tracking-wider text-emerald-300">After</div><pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-300">{scenario.contract.slice(0, 3).map((item) => `${item.field}: ${item.after}`).join('\\n')}</pre></div>
+          </div>
+        </Panel>
+      )}
+
+      {!compact && <Panel>
+        <div className="border-b border-base-700/70 px-3 py-2.5">
           <h3 className="text-sm font-semibold text-slate-100">Contract Comparison</h3>
           <p className="mt-0.5 text-xs text-slate-400">
             Before vs after across API and component consumers
@@ -108,7 +119,7 @@ export function CodeChangePanel({ scenario }: { scenario: PRScenario }) {
             </div>
           ))}
         </div>
-      </Panel>
+      </Panel>}
     </div>
   );
 }

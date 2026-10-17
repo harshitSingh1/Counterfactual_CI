@@ -34,8 +34,8 @@ function App() {
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div key={`${view}-${prId}`} className="animate-fade-in mx-auto max-w-6xl">
+        <main className="flex-1 overflow-y-auto p-3 md:p-4">
+          <div key={`${view}-${prId}`} className="animate-fade-in mx-auto max-w-[1500px]">
             {view === 'overview' && (
               <OverviewView scenario={scenario} onNavigate={setView} />
             )}
@@ -99,9 +99,9 @@ function App() {
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-      <p className="mt-0.5 text-sm text-slate-400">{subtitle}</p>
+    <div className="flex items-end justify-between gap-3">
+      <div><h2 className="text-lg font-semibold text-slate-100">{title}</h2><p className="mt-0.5 text-xs text-slate-500">{subtitle}</p></div>
+      <span className="text-[10px] text-slate-600">Demo data · no backend connected</span>
     </div>
   );
 }

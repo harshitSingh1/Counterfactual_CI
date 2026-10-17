@@ -18,20 +18,14 @@ const STATUS_META: Record<
 > = {
   pass: { label: 'Passed', tone: 'ok', Icon: CheckCircle2 },
   fail: { label: 'Failed', tone: 'bad', Icon: XCircle },
-  unverified: { label: 'Unverified', tone: 'warn', Icon: CircleSlash },
+  unverified: { label: 'Not run', tone: 'warn', Icon: CircleSlash },
 };
 
 export function TestResultsPanel({ tests }: { tests: TestCase[] }) {
-  const [running, setRunning] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
 
   const runTests = () => {
-    setRunning(true);
-    setShowNotice(false);
-    setTimeout(() => {
-      setRunning(false);
-      setShowNotice(true);
-    }, 1400);
+    setShowNotice(true);
   };
 
   return (
@@ -58,15 +52,10 @@ export function TestResultsPanel({ tests }: { tests: TestCase[] }) {
           right={
             <button
               onClick={runTests}
-              disabled={running}
-              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                running
-                  ? 'cursor-wait bg-base-700 text-slate-400'
-                  : 'bg-violet-500/90 text-white hover:bg-violet-500 glow-violet'
-              }`}
+              className="flex items-center gap-2 border border-accent-blue/60 bg-accent-blue/10 px-3 py-1.5 text-sm font-medium text-blue-200 transition-colors hover:bg-accent-blue/20"
             >
-              <Play size={14} className={running ? 'animate-pulse' : ''} />
-              {running ? 'Dispatching...' : 'Run Targeted Tests'}
+              <Play size={14} />
+              Run Targeted Tests
             </button>
           }
         />

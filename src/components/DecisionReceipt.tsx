@@ -124,7 +124,7 @@ function GraphPredictionTab({ scenario }: { scenario: PRScenario }) {
           </span>
         </div>
         <p className="mt-1.5 text-xs text-amber-200/70">
-          The graph below is generated from static FalkorDB trace data. It represents predicted
+          The graph below is a local demo trace. It represents predicted
           impact, not outcomes from executed tests.
         </p>
       </div>
@@ -146,7 +146,7 @@ function TestResultsTab({ scenario }: { scenario: PRScenario }) {
         {allUnverified ? (
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200">
             <AlertTriangle size={14} className="shrink-0" />
-            No tests have been executed yet. All {scenario.tests.length} tests remain unverified
+            No tests have been executed yet. All {scenario.tests.length} tests remain not run
             because the backend runner is not connected.
           </div>
         ) : (
@@ -166,7 +166,7 @@ function TestResultsTab({ scenario }: { scenario: PRScenario }) {
             </div>
             <div className="flex items-center gap-3">
               <Badge tone="neutral">{t.kind}</Badge>
-              <Badge tone="warn">Unverified</Badge>
+              <Badge tone="warn">Not run</Badge>
             </div>
           </div>
         ))}
