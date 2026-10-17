@@ -10,7 +10,7 @@ const NAV: { id: ViewId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'decision-receipt', label: 'Decision Receipt', icon: ReceiptText },
 ];
 
-export function Sidebar({ active, onSelect, open, onClose }: { active: ViewId; onSelect: (id: ViewId) => void; open: boolean; onClose: () => void }) {
+export function Sidebar({ active, onSelect, open, onClose, isConnected }: { active: ViewId; onSelect: (id: ViewId) => void; open: boolean; onClose: () => void; isConnected: boolean }) {
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={onClose} />}
@@ -32,7 +32,9 @@ export function Sidebar({ active, onSelect, open, onClose }: { active: ViewId; o
         </nav>
         <div className="border-t border-base-700/80 p-3">
           <div className="flex items-center gap-2 text-xs text-slate-300"><Database size={14} className="text-violet-300" /> FalkorDB</div>
-          <div className="mt-1 pl-5 text-[10px] leading-relaxed text-slate-500">Demo graph · not connected</div>
+          <div className="mt-1 pl-5 text-[10px] leading-relaxed text-slate-500">
+  {isConnected ? 'Live graph · connected' : 'Demo graph · not connected'}
+</div>
         </div>
       </aside>
     </>

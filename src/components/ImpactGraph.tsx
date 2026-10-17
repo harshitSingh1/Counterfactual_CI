@@ -31,10 +31,12 @@ export function ImpactGraph({
   nodes,
   edges,
   showInspector = true,
+  isLive = false,
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
   showInspector?: boolean;
+  isLive?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -78,9 +80,13 @@ export function ImpactGraph({
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-100">Dependency Trace Graph</h3>
-            <span className="border border-violet-400/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300">Demo graph</span>
+            <span className="border border-violet-400/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] text-violet-300">
+              {isLive ? 'Live FalkorDB graph' : 'Demo graph'}
+            </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-500">Static relationship preview · {nodes.length} nodes · {edges.length} edges</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {isLive ? 'Graph-derived impact trace' : 'Static relationship preview'} · {nodes.length} nodes · {edges.length} edges
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {selectedId && <button onClick={() => setSelectedId(null)} className="text-[10px] text-slate-500 hover:text-slate-200">Reset</button>}
@@ -178,7 +184,9 @@ export function ImpactGraph({
                     fill={STATUS_COLORS[node.status]}
                     opacity={0.8}
                   >
-                    {node.status}
+                    {isLive && node.id === 'verify_token'
+  ? 'change source'
+  : node.status}
                   </text>
                 </g>
               );
@@ -189,7 +197,7 @@ export function ImpactGraph({
         {showInspector && (
           <div className="border-t border-base-700/70 p-4 lg:border-l lg:border-t-0">
             {selected ? (
-              <NodeDetail node={selected} />
+              <NodeDetail node={selected} isLive={isLive} />
             ) : (
               <div className="flex h-full flex-col items-center justify-center py-8 text-center">
                 <Info size={22} className="text-slate-600" />
@@ -222,22 +230,43 @@ function Legend() {
   );
 }
 
-function NodeDetail({ node }: { node: GraphNode }) {
+
+function NodeDetail({
+  node,
+  isLive = false,
+}: {
+  node: GraphNode;
+  isLive?: boolean;
+}) {
   const meta = CATEGORY_META[node.category];
   const Icon = meta.Icon;
-  const statusTone =
-    node.status === 'impacted' ? 'bad' : node.status === 'unaffected' ? 'ok' : 'warn';
+  const isChangeSource = isLive && node.id === 'verify_token';
+
+  const statusTone = isChangeSource
+    ? 'neutral'
+    : node.status === 'impacted'
+      ? 'bad'
+      : node.status === 'unaffected'
+        ? 'ok'
+        : 'warn';
+
   return (
     <div className="animate-fade-in">
       <div className="flex items-center gap-2">
         <div
           className="flex h-8 w-8 items-center justify-center rounded-lg bg-base-800"
-          style={{ color: meta.color, boxShadow: `0 0 0 1px ${meta.color}55` }}
+          style={{
+            color: meta.color,
+            boxShadow: `0 0 0 1px ${meta.color}55`,
+          }}
         >
           <Icon size={16} />
         </div>
+
         <div>
-          <div className="text-sm font-semibold text-slate-100">{node.label}</div>
+          <div className="text-sm font-semibold text-slate-100">
+            {node.label}
+          </div>
           <div className="text-[10px] uppercase tracking-wider text-slate-500">
             {node.category}
           </div>
@@ -245,7 +274,10 @@ function NodeDetail({ node }: { node: GraphNode }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        <Badge tone={statusTone}>{node.status}</Badge>
+        <Badge tone={statusTone}>
+          {isChangeSource ? 'Change source' : node.status}
+        </Badge>
+
         {node.file && (
           <Badge tone="neutral" className="font-mono">
             {node.file}
@@ -253,7 +285,9 @@ function NodeDetail({ node }: { node: GraphNode }) {
         )}
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-slate-300">{node.detail}</p>
+      <p className="mt-3 text-sm leading-relaxed text-slate-300">
+        {node.detail}
+      </p>
     </div>
   );
 }

@@ -64,7 +64,7 @@ export interface PRScenario {
 
 export interface ImpactSummary {
   affectedJourneys: string[];
-  mappedCoverage: number;
+  mappedCoverage: number | null;
   uncoveredComponents: string[];
 }
 
