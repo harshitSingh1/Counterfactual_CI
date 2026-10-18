@@ -1,8 +1,16 @@
-
+import os
 from falkordb import FalkorDB
 
-db = FalkorDB(host="localhost", port=6379)
-graph = db.select_graph("counterfactual_ci")
+db = FalkorDB(
+    host=os.getenv("FALKORDB_HOST", "localhost"),
+    port=int(os.getenv("FALKORDB_PORT", "6379")),
+    username=os.getenv("FALKORDB_USERNAME") or None,
+    password=os.getenv("FALKORDB_PASSWORD") or None,
+    ssl=os.getenv("FALKORDB_TLS", "false").lower() in {"1", "true", "yes"},
+    socket_connect_timeout=10,
+    socket_timeout=10,
+)
+graph = db.select_graph(os.getenv("FALKORDB_GRAPH", "counterfactual_ci"))
 
 # Reset and recreate the demo graph.
 graph.query("MATCH (n) DETACH DELETE n")
