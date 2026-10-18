@@ -283,3 +283,82 @@ export async function analyzeGitDiff(
 
   return response.json();
 }
+
+
+export interface DiffImpactEvidencePath {
+  changed_file: string;
+  matched_source: string;
+  nodes: Array<{
+    id: string;
+    name: string | null;
+    file: string | null;
+    labels: string[];
+  }>;
+  relationships: string[];
+}
+
+export interface DiffImpactResult {
+  status: string;
+  graph: string;
+  diff_summary: {
+    files_changed: number;
+    additions: number;
+    deletions: number;
+  };
+  matched_sources: Array<BackendGraphNode & {
+    match_reason: string;
+    changed_file: string;
+  }>;
+  unmatched_files: string[];
+  impacted_nodes: BackendGraphNode[];
+  recommended_tests: Array<{
+    id: string;
+    name: string | null;
+    file: string | null;
+    reason: string;
+    evidence_relationships: string[];
+    source_file: string;
+  }>;
+  evidence_paths: DiffImpactEvidencePath[];
+  evidence_summary: {
+    matched_source_count: number;
+    impacted_node_count: number;
+    recommended_test_count: number;
+    unmatched_file_count: number;
+  };
+  limitations: string[];
+}
+
+export async function analyzeDiffImpact(
+  diff: string,
+): Promise<DiffImpactResult> {
+  const response = await fetch(`${API_BASE}/api/analyze-diff-impact`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ diff }),
+  });
+
+  if (!response.ok) {
+    let message = `Graph impact analysis failed: HTTP ${response.status}`;
+
+    try {
+      const body = await response.json();
+      if (typeof body.detail === 'string') {
+        message = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        message = body.detail
+          .map((item: { msg?: string }) => item.msg ?? 'Invalid request')
+          .join('; ');
+      }
+    } catch {
+      // Keep the HTTP status message if the response isn't JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}

@@ -161,6 +161,165 @@ def analyze_diff_endpoint(request: DiffAnalysisRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+
+def _normalize_symbol(value: str | None) -> str:
+    """Normalize graph names such as verify_token() for symbol matching."""
+    if not value:
+        return ""
+    return value.strip().removesuffix("()").strip()
+
+
+@app.post("/api/analyze-diff-impact")
+def analyze_diff_impact_endpoint(request: DiffAnalysisRequest):
+    try:
+        diff_analysis = analyze_git_diff(request.diff)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Load the real graph through the existing FalkorDB-backed endpoint.
+    graph_data = get_graph_data()
+    nodes = graph_data["nodes"]
+    edges = graph_data["edges"]
+
+    changed_files = diff_analysis["files"]
+    matched_sources = []
+    unmatched_files = []
+
+    for changed_file in changed_files:
+        path = changed_file["path"].replace("\\", "/").lower()
+        symbols = {
+            _normalize_symbol(symbol).lower()
+            for symbol in changed_file["changed_symbols"]
+        }
+
+        matches = []
+        for node in nodes:
+            node_file = (node.get("file") or "").replace("\\", "/").lower()
+            node_name = _normalize_symbol(node.get("name")).lower()
+
+            # A path match is useful even when no declaration was detected.
+            file_match = bool(node_file) and node_file == path
+            symbol_match = bool(node_name) and node_name in symbols
+
+            if file_match or symbol_match:
+                matches.append({
+                    **node,
+                    "match_reason": (
+                        "file_and_symbol"
+                        if file_match and symbol_match
+                        else "file"
+                        if file_match
+                        else "symbol"
+                    ),
+                    "changed_file": changed_file["path"],
+                })
+
+        if matches:
+            matched_sources.extend(matches)
+        else:
+            unmatched_files.append(changed_file["path"])
+
+    # Traverse only relationships that exist in FalkorDB.
+    outgoing = {}
+    for edge in edges:
+        outgoing.setdefault(edge["source"], []).append(edge)
+
+    node_by_id = {node["id"]: node for node in nodes}
+    impacted_by_id = {}
+    evidence_paths = []
+    recommended_tests = {}
+
+    # Keep separate paths so every recommendation has a traceable reason.
+    for source in matched_sources:
+        source_id = source["id"]
+        queue = [(source_id, [source_id], [])]
+        visited_depth = {source_id: 0}
+
+        while queue:
+            current_id, node_path, relationship_path = queue.pop(0)
+            depth = len(relationship_path)
+
+            if depth >= 4:
+                continue
+
+            for edge in outgoing.get(current_id, []):
+                target_id = edge["target"]
+
+                # Avoid cycles within one evidence path.
+                if target_id in node_path or target_id not in node_by_id:
+                    continue
+
+                next_nodes = node_path + [target_id]
+                next_relationships = relationship_path + [
+                    edge["relationship"]
+                ]
+
+                target = node_by_id[target_id]
+                impacted_by_id[target_id] = target
+
+                evidence_paths.append({
+                    "changed_file": source["changed_file"],
+                    "matched_source": source_id,
+                    "nodes": [
+                        {
+                            "id": node_id,
+                            "name": node_by_id[node_id].get("name"),
+                            "file": node_by_id[node_id].get("file"),
+                            "labels": node_by_id[node_id].get("labels", []),
+                        }
+                        for node_id in next_nodes
+                    ],
+                    "relationships": next_relationships,
+                })
+
+                labels = target.get("labels") or []
+                if "PlaywrightSpec" in labels:
+                    recommended_tests[target_id] = {
+                        "id": target_id,
+                        "name": target.get("name"),
+                        "file": target.get("file"),
+                        "reason": (
+                            "Reachable from a changed graph node through "
+                            "recorded relationships."
+                        ),
+                        "evidence_relationships": next_relationships,
+                        "source_file": source["changed_file"],
+                    }
+
+                next_depth = len(next_relationships)
+                if next_depth < visited_depth.get(target_id, 999):
+                    visited_depth[target_id] = next_depth
+                    queue.append(
+                        (target_id, next_nodes, next_relationships)
+                    )
+
+    return {
+        "status": "analyzed",
+        "graph": graph_data["graph"],
+        "diff_summary": diff_analysis["summary"],
+        "matched_sources": matched_sources,
+        "unmatched_files": unmatched_files,
+        "impacted_nodes": list(impacted_by_id.values()),
+        "recommended_tests": list(recommended_tests.values()),
+        "evidence_paths": evidence_paths,
+        "evidence_summary": {
+            "matched_source_count": len(matched_sources),
+            "impacted_node_count": len(impacted_by_id),
+            "recommended_test_count": len(recommended_tests),
+            "unmatched_file_count": len(unmatched_files),
+        },
+        "limitations": [
+            "Impact recommendations are limited to nodes and directed "
+            "relationships currently recorded in FalkorDB.",
+            "A missing match does not prove that a file has no dependencies.",
+            "Reachability indicates a potential impact, not a confirmed failure.",
+            "Recommended tests have not been executed by this endpoint.",
+            "Symbol matching uses lightweight declaration detection, not a "
+            "complete language parser.",
+        ],
+    }
+
+
 @app.get("/api/analysis")
 def analyze_change(pr: int = 101):
     if pr != 101:

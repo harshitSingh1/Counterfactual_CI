@@ -3,7 +3,12 @@ import { useState } from 'react';
 import type { PRScenario } from '@/types';
 import { Panel, PanelHeader, Badge } from '@/components/ui';
 import { FileCode2, AlertTriangle, ArrowRight, Loader2, Search, CheckCircle2 } from 'lucide-react';
-import { analyzeGitDiff, type DiffAnalysisResult } from '@/lib/api';
+import {
+  analyzeGitDiff,
+  analyzeDiffImpact,
+  type DiffAnalysisResult,
+  type DiffImpactResult,
+} from '@/lib/api';
 
 export function CodeChangePanel({
   scenario,
@@ -19,6 +24,9 @@ export function CodeChangePanel({
   const [result, setResult] = useState<DiffAnalysisResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [impactResult, setImpactResult] = useState<DiffImpactResult | null>(null);
+const [impactError, setImpactError] = useState('');
+const [impactLoading, setImpactLoading] = useState(false);
 
   async function handleAnalyzeDiff() {
     setError('');
@@ -41,6 +49,28 @@ export function CodeChangePanel({
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleTraceImpact() {
+    setImpactError('');
+    setImpactResult(null);
+    if (!diffInput.trim()) {
+      setImpactError('Paste a unified Git diff before tracing graph impact.');
+      return;
+    }
+    setImpactLoading(true);
+    try {
+      const response = await analyzeDiffImpact(diffInput);
+      setImpactResult(response);
+    } catch (err) {
+      setImpactError(
+        err instanceof Error
+          ? err.message
+          : 'Could not trace graph impact. Check the backend and FalkorDB connection.',
+      );
+    } finally {
+      setImpactLoading(false);
     }
   }
 
@@ -150,6 +180,20 @@ export function CodeChangePanel({
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
                 {loading ? 'Analyzing…' : 'Analyze diff'}
               </button>
+<button
+  type="button"
+  onClick={handleTraceImpact}
+  disabled={impactLoading || !diffInput.trim() || diffInput.length > 200_000}
+  className="inline-flex items-center gap-2 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  {impactLoading ? (
+    <Loader2 size={14} className="animate-spin" />
+  ) : (
+    <Search size={14} />
+  )}
+  {impactLoading ? 'Tracing graph…' : 'Trace Impact Through FalkorDB'}
+</button>
+
             </div>
           </div>
 
@@ -229,6 +273,227 @@ export function CodeChangePanel({
               </div>
             </div>
           )}
+          {impactError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300"
+            >
+              {impactError}
+            </div>
+          )}
+
+          {impactResult && (
+            <div className="space-y-3 border-t border-base-700/70 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-violet-200">
+                  <CheckCircle2 size={16} />
+                  FalkorDB impact trace completed
+                </div>
+                <Badge tone="neutral">{impactResult.graph}</Badge>
+              </div>
+
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                These are potential impacts inferred from recorded graph
+                relationships, not confirmed failures.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  {
+                    label: 'Matched sources',
+                    value: impactResult.evidence_summary.matched_source_count,
+                  },
+                  {
+                    label: 'Impacted nodes',
+                    value: impactResult.evidence_summary.impacted_node_count,
+                  },
+                  {
+                    label: 'Suggested tests',
+                    value: impactResult.evidence_summary.recommended_test_count,
+                  },
+                  {
+                    label: 'Unmatched files',
+                    value: impactResult.evidence_summary.unmatched_file_count,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-base-700/70 bg-base-900/40 p-3"
+                  >
+                    <div className="text-[10px] text-slate-500">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-xl font-semibold tabular-nums text-slate-100">
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-slate-200">
+                  Matched graph sources
+                </h4>
+                {impactResult.matched_sources.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    No changed files or symbols matched a recorded graph node.
+                    This does not prove there are no dependencies.
+                  </p>
+                ) : (
+                  impactResult.matched_sources.map((source, index) => (
+                    <div
+                      key={`${source.id}-${source.changed_file}-${index}`}
+                      className="rounded-lg border border-base-700/70 p-3"
+                    >
+                      <div className="font-mono text-xs text-slate-200">
+                        {source.name || source.id}
+                      </div>
+                      <div className="mt-1 break-all text-[11px] text-slate-400">
+                        {source.changed_file}
+                      </div>
+                      <div className="mt-1 text-[11px] text-violet-300">
+                        Match: {source.match_reason}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-slate-200">
+                  Potentially impacted nodes
+                </h4>
+                {impactResult.impacted_nodes.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    No downstream nodes were found through recorded outgoing
+                    relationships.
+                  </p>
+                ) : (
+                  impactResult.impacted_nodes.map((node) => (
+                    <div
+                      key={node.id}
+                      className="rounded-lg border border-base-700/70 p-3"
+                    >
+                      <div className="font-mono text-xs text-slate-200">
+                        {node.name || node.id}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        {(node.labels || []).join(', ')} · {node.layer}
+                      </div>
+                      {node.file && (
+                        <div className="mt-1 break-all text-[11px] text-slate-500">
+                          {node.file}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-slate-200">
+                  Recommended tests
+                </h4>
+                {impactResult.recommended_tests.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    No test nodes were reachable from the matched sources in
+                    the current graph.
+                  </p>
+                ) : (
+                  impactResult.recommended_tests.map((test) => (
+                    <div
+                      key={test.id}
+                      className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3"
+                    >
+                      <div className="font-mono text-xs text-emerald-200">
+                        {test.name || test.id}
+                      </div>
+                      {test.file && (
+                        <div className="mt-1 break-all text-[11px] text-slate-400">
+                          {test.file}
+                        </div>
+                      )}
+                      <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                        Evidence relationships:{' '}
+                        <span className="font-mono text-slate-300">
+                          {test.evidence_relationships.join(' → ')}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {test.reason} Tests have not been executed.
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {impactResult.evidence_paths.length > 0 && (
+                <details className="rounded-lg border border-base-700/70 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-200">
+                    Inspect graph evidence paths (
+                    {impactResult.evidence_paths.length})
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {impactResult.evidence_paths.map((path, index) => (
+                      <div
+                        key={`${path.matched_source}-${index}`}
+                        className="rounded-lg bg-base-900/60 p-3"
+                      >
+                        <div className="break-all text-[11px] text-slate-400">
+                          Changed file: {path.changed_file}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1">
+                          {path.nodes.map((node, nodeIndex) => (
+                            <span key={`${node.id}-${nodeIndex}`} className="contents">
+                              {nodeIndex > 0 && (
+                                <ArrowRight
+                                  size={12}
+                                  className="shrink-0 text-violet-300"
+                                />
+                              )}
+                              <span className="rounded border border-base-700 px-2 py-1 font-mono text-[10px] text-slate-300">
+                                {node.name || node.id}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-2 font-mono text-[10px] text-violet-300">
+                          {path.relationships.join(' → ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {impactResult.unmatched_files.length > 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                  <h4 className="text-xs font-semibold text-amber-300">
+                    Files not matched in the graph
+                  </h4>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-slate-400">
+                    {impactResult.unmatched_files.map((file) => (
+                      <li key={file} className="break-all font-mono">
+                        {file}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <h4 className="text-xs font-semibold text-amber-300">
+                  Evidence limitations
+                </h4>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-400">
+                  {impactResult.limitations.map((limitation) => (
+                    <li key={limitation}>{limitation}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
         </div>
       </Panel>
 
