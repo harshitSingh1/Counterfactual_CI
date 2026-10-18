@@ -6,7 +6,6 @@ Counterfactual CI is a graph-powered code change impact analysis prototype built
 
 Instead of inspecting changed files in isolation, Counterfactual CI matches a Git diff to recorded graph entities, traces their outgoing relationships, and recommends potentially relevant tests with inspectable evidence paths.
 
-[GitHub Repository](https://github.com/harshitSingh1/Counterfactual_CI) · [Open in Bolt](https://bolt.new/~/sb1-eu77ym59)
 
 ## The problem
 
