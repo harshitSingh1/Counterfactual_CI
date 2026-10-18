@@ -34,11 +34,24 @@ app.add_middleware(
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
+FALKORDB_USERNAME = os.getenv("FALKORDB_USERNAME") or None
+FALKORDB_PASSWORD = os.getenv("FALKORDB_PASSWORD") or None
+FALKORDB_TLS = os.getenv("FALKORDB_TLS", "false").lower() in {
+    "1", "true", "yes"
+}
 GRAPH_NAME = os.getenv("FALKORDB_GRAPH", "counterfactual_ci")
 
 
 def get_graph():
-    db = FalkorDB(host=FALKORDB_HOST, port=FALKORDB_PORT)
+    db = FalkorDB(
+        host=FALKORDB_HOST,
+        port=FALKORDB_PORT,
+        username=FALKORDB_USERNAME,
+        password=FALKORDB_PASSWORD,
+        ssl=FALKORDB_TLS,
+        socket_connect_timeout=10,
+        socket_timeout=10,
+    )
     return db.select_graph(GRAPH_NAME)
 
 
