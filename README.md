@@ -1,4 +1,6 @@
 # Counterfactual CI
+<img width="1912" height="866" alt="Screenshot 2026-10-18 185141" src="https://github.com/user-attachments/assets/8b421541-314c-4b50-8510-4b405df196d4" />
+
 
 **Predict. Compare. Verify. Ship Confidently.**
 
