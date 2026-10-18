@@ -88,7 +88,7 @@ function App() {
       : scenario.impactSummary;
 
   return (
-    <div className="flex min-h-screen bg-base-950">
+    <div className="flex h-screen overflow-hidden bg-base-950">
       <Sidebar
   active={view}
   onSelect={setView}
@@ -97,14 +97,14 @@ function App() {
   isConnected={Boolean(liveNodes) && !apiError}
 />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col lg:ml-[188px]">
         <Header
           selectedPR={prId}
           onSelectPR={setPrId}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-3 md:p-4">
+        <main className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
           <div key={`${view}-${prId}`} className="animate-fade-in mx-auto max-w-[1500px]">
             {view === 'overview' && (
               <OverviewView
@@ -180,11 +180,10 @@ function App() {
                   title="Simulation"
                   subtitle="Counterfactual repair options with predicted outcomes"
                 />
-                <SimulationPanel
-  options={scenario.repairOptions}
-  live={isPR101 && Boolean(analysis && liveNodes)}
-  analysis={analysis}
-/>
+            <SimulationPanel
+              options={scenario.repairOptions}
+              live={isPR101 && Boolean(analysis && liveNodes)}
+            />
               </div>
             )}
 
