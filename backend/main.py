@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from falkordb import FalkorDB
 from pydantic import BaseModel, Field
 
-from diff_analyzer import analyze_git_diff
+from backend.diff_analyzer import analyze_git_diff
 
 app = FastAPI(
     title="Counterfactual CI API",
