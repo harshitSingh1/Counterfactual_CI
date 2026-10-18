@@ -227,4 +227,59 @@ export interface CounterfactualAnalysis {
   
     return response.json();
   }
-  
+export interface DiffAnalysisFile {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changed_symbols: string[];
+  analysis_note: string;
+}
+
+export interface DiffAnalysisResult {
+  status: string;
+  analysis: {
+    summary: {
+      files_changed: number;
+      additions: number;
+      deletions: number;
+    };
+    file_types: Record<string, number>;
+    files: DiffAnalysisFile[];
+    limitations: string[];
+  };
+}
+
+export async function analyzeGitDiff(
+  diff: string,
+): Promise<DiffAnalysisResult> {
+  const response = await fetch(`${API_BASE}/api/analyze-diff`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ diff }),
+  });
+
+  if (!response.ok) {
+    let message = `Diff analysis failed: HTTP ${response.status}`;
+
+    try {
+      const body = await response.json();
+      if (typeof body.detail === 'string') {
+        message = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        message = body.detail
+          .map((item: { msg?: string }) => item.msg ?? 'Invalid request')
+          .join('; ');
+      }
+    } catch {
+      // Keep the HTTP status message if the response isn't JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return response.json();
+}

@@ -4,12 +4,22 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from falkordb import FalkorDB
+from pydantic import BaseModel, Field
+
+from diff_analyzer import analyze_git_diff
 
 app = FastAPI(
     title="Counterfactual CI API",
     description="Graph-powered code change impact analysis",
     version="0.3.0",
 )
+class DiffAnalysisRequest(BaseModel):
+    diff: str = Field(
+        ...,
+        min_length=1,
+        max_length=200_000,
+        description="Unified Git diff text to analyze",
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,6 +151,15 @@ def get_graph_data():
         "edges": edges,
     }
 
+@app.post("/api/analyze-diff")
+def analyze_diff_endpoint(request: DiffAnalysisRequest):
+    try:
+        return {
+            "status": "analyzed",
+            "analysis": analyze_git_diff(request.diff),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/api/analysis")
 def analyze_change(pr: int = 101):

@@ -1,7 +1,9 @@
 
+import { useState } from 'react';
 import type { PRScenario } from '@/types';
 import { Panel, PanelHeader, Badge } from '@/components/ui';
-import { FileCode2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { FileCode2, AlertTriangle, ArrowRight, Loader2, Search, CheckCircle2 } from 'lucide-react';
+import { analyzeGitDiff, type DiffAnalysisResult } from '@/lib/api';
 
 export function CodeChangePanel({
   scenario,
@@ -12,6 +14,45 @@ export function CodeChangePanel({
 }) {
   const isAuthRefactor = scenario.number === 101;
   const breakingCount = scenario.contract.filter((c) => c.breaking).length;
+
+  const [diffInput, setDiffInput] = useState('');
+  const [result, setResult] = useState<DiffAnalysisResult | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleAnalyzeDiff() {
+    setError('');
+    setResult(null);
+
+    if (!diffInput.trim()) {
+      setError('Paste a unified Git diff before running analysis.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await analyzeGitDiff(diffInput);
+      setResult(response);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not analyze this diff. Check that the backend is running.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sampleDiff = `diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py
+@@ -1,2 +1,3 @@
+-def old_function():
+-    return False
++def new_function():
++    return True
++`;
 
   return (
     <div className="space-y-4">
@@ -35,21 +76,15 @@ export function CodeChangePanel({
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 <div>
                   <div className="text-[10px] text-slate-500">Changed symbol</div>
-                  <div className="mt-1 font-mono text-xs text-slate-200">
-                    verify_token()
-                  </div>
+                  <div className="mt-1 font-mono text-xs text-slate-200">verify_token()</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500">Previous contract</div>
-                  <div className="mt-1 font-mono text-xs text-slate-200">
-                    user_id
-                  </div>
+                  <div className="mt-1 font-mono text-xs text-slate-200">user_id</div>
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500">Proposed contract</div>
-                  <div className="mt-1 font-mono text-xs text-slate-200">
-                    sub
-                  </div>
+                  <div className="mt-1 font-mono text-xs text-slate-200">sub</div>
                 </div>
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
@@ -64,6 +99,136 @@ export function CodeChangePanel({
             <span>·</span>
             <span>Illustrative sample · not fetched from repository</span>
           </div>
+        </div>
+      </Panel>
+
+      <Panel>
+        <div className="border-b border-base-700/70 px-3 py-3">
+          <div className="flex items-center gap-2">
+            <Search size={15} className="text-violet-300" />
+            <h3 className="text-sm font-semibold text-slate-100">Analyze a Real Git Diff</h3>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            Paste a unified diff from Git to inspect changed files, line counts,
+            and likely declarations. This analysis is static and does not run
+            your code or tests.
+          </p>
+        </div>
+
+        <div className="space-y-3 p-3">
+          <textarea
+            value={diffInput}
+            onChange={(event) => setDiffInput(event.target.value)}
+            placeholder={'Paste output from git diff here...\n\nExample:\n+++ b/src/example.ts\n@@ -1 +1 @@\n-oldValue\n+newValue'}
+            spellCheck={false}
+            className="min-h-44 w-full resize-y rounded-lg border border-base-700 bg-base-900/70 p-3 font-mono text-xs leading-relaxed text-slate-200 outline-none placeholder:text-slate-600 focus:border-violet-500/60"
+            aria-label="Paste unified Git diff"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] text-slate-500">
+              {diffInput.length.toLocaleString()} / 200,000 characters
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDiffInput(sampleDiff);
+                  setResult(null);
+                  setError('');
+                }}
+                className="rounded-lg border border-base-700 px-3 py-2 text-xs text-slate-300 transition hover:bg-base-800"
+              >
+                Load sample
+              </button>
+              <button
+                type="button"
+                onClick={handleAnalyzeDiff}
+                disabled={loading || !diffInput.trim() || diffInput.length > 200_000}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                {loading ? 'Analyzing…' : 'Analyze diff'}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+              {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="space-y-3 border-t border-base-700/70 pt-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-300">
+                <CheckCircle2 size={16} />
+                Diff parsed successfully
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Files changed', value: result.analysis.summary.files_changed },
+                  { label: 'Additions', value: result.analysis.summary.additions },
+                  { label: 'Deletions', value: result.analysis.summary.deletions },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg border border-base-700/70 bg-base-900/40 p-3">
+                    <div className="text-[10px] text-slate-500">{item.label}</div>
+                    <div className="mt-1 text-xl font-semibold tabular-nums text-slate-100">
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-slate-200">Changed files</h4>
+                {result.analysis.files.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    No safe file paths were found in this diff.
+                  </p>
+                ) : (
+                  result.analysis.files.map((file) => (
+                    <div key={file.path} className="rounded-lg border border-base-700/70 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="break-all font-mono text-xs text-slate-200">{file.path}</span>
+                        <span className="text-[11px]">
+                          <span className="text-emerald-300">+{file.additions}</span>
+                          {' / '}
+                          <span className="text-red-300">−{file.deletions}</span>
+                        </span>
+                      </div>
+
+                      {file.changed_symbols.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {file.changed_symbols.map((symbol) => (
+                            <Badge key={symbol} tone="neutral">{symbol}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          No likely declaration detected in added lines.
+                        </p>
+                      )}
+
+                      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                        {file.analysis_note}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <h4 className="text-xs font-semibold text-amber-300">Analysis limitations</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-400">
+                  {result.analysis.limitations.map((limitation) => (
+                    <li key={limitation}>{limitation}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </Panel>
 
@@ -116,9 +281,7 @@ export function CodeChangePanel({
                       {line.newNo ?? ''}
                     </td>
                     <td className={`w-5 select-none pl-3 ${text}`}>{marker}</td>
-                    <td className={`whitespace-pre px-2 py-0.5 ${text}`}>
-                      {line.text}
-                    </td>
+                    <td className={`whitespace-pre px-2 py-0.5 ${text}`}>{line.text}</td>
                   </tr>
                 );
               })}
@@ -127,49 +290,33 @@ export function CodeChangePanel({
         </div>
       </Panel>
 
-      {compact && (
+      {compact ? (
         <Panel>
           <div className="border-b border-base-700/80 px-3 py-2.5">
-            <h3 className="text-sm font-semibold text-slate-100">
-              Example Contract Comparison
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-100">Example Contract Comparison</h3>
             <p className="mt-1 text-[11px] text-amber-300">
               Scenario data · verdicts have not been independently verified
             </p>
           </div>
           <div className="grid grid-cols-2 divide-x divide-base-700/80">
             <div className="bg-red-500/5 p-3">
-              <div className="text-[10px] font-medium uppercase tracking-wider text-red-300">
-                Before
-              </div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-red-300">Before</div>
               <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-300">
-                {scenario.contract
-                  .slice(0, 3)
-                  .map((item) => `${item.field}: ${item.before}`)
-                  .join('\n')}
+                {scenario.contract.slice(0, 3).map((item) => `${item.field}: ${item.before}`).join('\n')}
               </pre>
             </div>
             <div className="bg-emerald-500/5 p-3">
-              <div className="text-[10px] font-medium uppercase tracking-wider text-emerald-300">
-                After
-              </div>
+              <div className="text-[10px] font-medium uppercase tracking-wider text-emerald-300">After</div>
               <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-300">
-                {scenario.contract
-                  .slice(0, 3)
-                  .map((item) => `${item.field}: ${item.after}`)
-                  .join('\n')}
+                {scenario.contract.slice(0, 3).map((item) => `${item.field}: ${item.after}`).join('\n')}
               </pre>
             </div>
           </div>
         </Panel>
-      )}
-
-      {!compact && (
+      ) : (
         <Panel>
           <div className="border-b border-base-700/70 px-3 py-2.5">
-            <h3 className="text-sm font-semibold text-slate-100">
-              Example Contract Comparison
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-100">Example Contract Comparison</h3>
             <p className="mt-1 text-xs text-slate-400">
               Scenario examples across API and component consumers. These
               verdicts are not verified against repository source or test runs.
@@ -186,9 +333,7 @@ export function CodeChangePanel({
             {scenario.contract.map((c, i) => (
               <div
                 key={i}
-                className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center ${
-                  c.breaking ? 'bg-red-500/5' : ''
-                }`}
+                className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center ${c.breaking ? 'bg-red-500/5' : ''}`}
               >
                 <div className="flex w-full items-center gap-2 sm:w-64">
                   {c.breaking ? (
@@ -196,9 +341,7 @@ export function CodeChangePanel({
                   ) : (
                     <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-slate-500/50" />
                   )}
-                  <span className="font-mono text-xs text-slate-300">
-                    {c.field}
-                  </span>
+                  <span className="font-mono text-xs text-slate-300">{c.field}</span>
                 </div>
                 <div className="flex flex-1 items-center gap-2 font-mono text-xs">
                   <span className="text-slate-400">{c.before}</span>
@@ -207,9 +350,7 @@ export function CodeChangePanel({
                 </div>
                 <div className="sm:w-36 sm:text-right">
                   <Badge tone="neutral">
-                    {c.breaking
-                      ? 'Breaking · illustrative'
-                      : 'Safe · illustrative'}
+                    {c.breaking ? 'Breaking · illustrative' : 'Safe · illustrative'}
                   </Badge>
                 </div>
               </div>
@@ -225,7 +366,7 @@ export function CodeChangePanel({
             Dependency impact is analyzed separately using the connected
             FalkorDB graph. A predicted dependency does not by itself prove a
             contract violation, a test failure, or a safe repair. Automated
-            tests have not been executed.
+            tests have not been executed by this diff analyzer.
           </p>
         </div>
       </Panel>
